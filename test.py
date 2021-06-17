@@ -1,8 +1,6 @@
 import json
 
 
-# ahahhahahaaaaaaahhhhhhhhhhhhhhhhhhhhhhaaa
-
 def make_draft(data: dict) -> dict:
     draft = {}
     # TODO: Make draft here
