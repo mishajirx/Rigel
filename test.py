@@ -1,5 +1,5 @@
 import json
-# тест терминатор
+# тест терминатор 2
 
 def make_draft(data: dict) -> dict:
     draft = {}
