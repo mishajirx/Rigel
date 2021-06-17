@@ -27,61 +27,6 @@ class Vector:
 
 # endregion
 
-# region battle commands
-
-@dataclass
-class CommandParameters(JSONCapability):
-    pass
-
-
-@dataclass
-class AttackCommandParameters(CommandParameters):
-    Id: int
-    Name: str
-    Target: Vector
-
-
-@dataclass
-class MoveCommandParameters(CommandParameters):
-    Id: int
-    Target: Vector
-
-
-@dataclass
-class AccelerateCommandParameters(CommandParameters):
-    Id: int
-    Vector: Vector
-
-
-@dataclass
-class UserCommand(JSONCapability):
-    Command: str
-    Parameters: CommandParameters
-
-
-@dataclass
-class BattleOutput(JSONCapability):
-    Message: str = None
-    UserCommands: List[UserCommand] = None
-
-
-# endregion
-
-# region draft commands
-@dataclass
-class DraftChoice(JSONCapability):
-    # TODO Make draft choice
-    pass
-
-
-@dataclass
-class DraftOptions:
-    # TODO: Parse draft options
-    pass
-
-
-# endregion
-
 # region equipment
 
 class EquipmentType(Enum):
@@ -150,6 +95,121 @@ class EffectType(EquipmentBlock):
 
 # endregion
 
+# region battle commands
+
+@dataclass
+class CommandParameters(JSONCapability):
+    pass
+
+
+@dataclass
+class AttackCommandParameters(CommandParameters):
+    Id: int
+    Name: str
+    Target: Vector
+
+
+@dataclass
+class MoveCommandParameters(CommandParameters):
+    Id: int
+    Target: Vector
+
+
+@dataclass
+class AccelerateCommandParameters(CommandParameters):
+    Id: int
+    Vector: Vector
+
+
+@dataclass
+class UserCommand(JSONCapability):
+    Command: str
+    Parameters: CommandParameters
+
+
+@dataclass
+class BattleOutput(JSONCapability):
+    Message: str = None
+    UserCommands: List[UserCommand] = None
+
+
+# endregion
+
+# region draft commands
+@dataclass
+class MapRegion(JSONCapability):
+    From: Vector
+    To: Vector
+
+    @classmethod
+    def from_json(cls, data):
+        v1 = Vector.from_json(data['From'])
+        v2 = Vector.from_json(data['To'])
+        return cls(v1, v2)
+
+
+@dataclass
+class DraftEquipment(JSONCapability):
+    Size: int
+    Equipment: List[EquipmentBlock]
+
+    @classmethod
+    def from_json(cls, data):
+        size = data['Size']
+        equipment = EquipmentBlock.from_json(data['Equipment'])
+        return cls(size, equipment)
+
+
+@dataclass
+class DraftCompleteShip(JSONCapability):
+    Id: str
+    Price: int
+    Equipment: List[str]
+
+    @classmethod
+    def from_json(cls, data):
+        Id = data['Id']
+        price = data['Price']
+        equipment = data['Equipment']
+        return cls(Id, price, equipment)
+
+
+@dataclass
+class DraftChoice(JSONCapability):
+    # TODO Make draft choice
+    pass
+
+
+@dataclass
+class DraftOptions(JSONCapability):
+    PlayerId: int
+    MapSize: int
+    Money: int
+    MaxShipsCount: int
+    # DraftTimeOut: int
+    # BattleRoundTimeOut: int
+    StartArea: MapRegion
+    Equipment: List[DraftEquipment]
+    Ships: List[DraftCompleteShip]
+
+    @classmethod
+    def from_json(cls, data):
+        start_area = MapRegion.from_json(data['StartArea'])
+        equipment = list(map(DraftEquipment.from_json, data['Equipment']))
+        ships = list(map(DraftCompleteShip.from_json, data['CompleteShips']))
+        player_id = data['PlayerId']
+        map_size = data['MapSize']
+        money = data['Money']
+        max_ships_count = data['MaxShipsCount']
+        # draft_time_out = data['DraftTimeOut']
+        # battle_round_time_out = data['BattleRoundTimeOut']
+        return cls(player_id, map_size, money, max_ships_count, start_area, equipment, ships)
+        # return cls(player_id, map_size, money, max_ships_count, draft_time_out, battle_round_time_out,
+        #            start_area, equipment, ships)
+
+
+# endregion
+
 # region battle state
 
 @dataclass
@@ -201,6 +261,8 @@ class BattleState(JSONCapability):
 
 
 def make_draft(data: dict) -> DraftChoice:
+    draft_options = DraftOptions.from_json(data)
+    draft_choice = DraftChoice()
     # TODO: parse input data
     # TODO: Make draft
     return DraftChoice()
