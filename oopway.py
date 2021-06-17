@@ -175,9 +175,9 @@ class DraftCompleteShip(JSONCapability):
 
 
 @dataclass
-class DraftChoice(JSONCapability):
-    # TODO Make draft choice
-    pass
+class DraftShipChoice(JSONCapability):
+    CompleteShipId: str
+    Position: Vector = None
 
 
 @dataclass
@@ -206,6 +206,12 @@ class DraftOptions(JSONCapability):
         return cls(player_id, map_size, money, max_ships_count, start_area, equipment, ships)
         # return cls(player_id, map_size, money, max_ships_count, draft_time_out, battle_round_time_out,
         #            start_area, equipment, ships)
+
+
+@dataclass
+class DraftChoice(JSONCapability):
+    Message: str = None
+    Ships: List[DraftCompleteShip] = None
 
 
 # endregion
@@ -261,22 +267,31 @@ class BattleState(JSONCapability):
 
 
 def make_draft(data: dict) -> DraftChoice:
+    # принимаем данные
     draft_options = DraftOptions.from_json(data)
-    draft_choice = DraftChoice()
-    # TODO: parse input data
-    # TODO: Make draft
-    return DraftChoice()
+    draft_choice = DraftChoice(Message='AHAHAHA')
+    # пихаем все корабли руками (место выбирается автоматически)
+    draft_choice.Ships = []
+    for i in range(5):
+        draft_choice.Ships.append(DraftShipChoice('scout'))
+    return draft_choice
 
 
 def make_turn(data: dict) -> BattleOutput:
+    # принимаем данные
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
     battle_output.Message = f"I have {len(battle_state.My)} ships and move to center of galaxy and shoot"
     battle_output.UserCommands = []
     for ship in battle_state.My:
-        battle_output.UserCommands.append(UserCommand(Command="MOVE",
-                                                      Parameters=MoveCommandParameters(ship.Id, Vector(15, 15, 15))))
+        # каждому отдельному кораблю даём команду двигаться на автопилоте
+        battle_output.UserCommands.append(
+            UserCommand(Command="MOVE",
+                        Parameters=MoveCommandParameters(ship.Id, Vector(15, 15, 15)))
+        )
+        # ищем у отдельного корабля блок с пушкой
         guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]
+        # если нашли- даём команду стрелять
         if guns:
             battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                           Parameters=AttackCommandParameters(ship.Id,
