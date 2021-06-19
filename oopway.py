@@ -274,7 +274,7 @@ def make_draft(data: dict) -> DraftChoice:
     draft_choice.Ships = []
     for i in range(5):
         draft_choice.Ships.append(DraftShipChoice('scout'))
-    return draft_choice
+    return DraftChoice()
 
 
 def make_turn(data: dict) -> BattleOutput:
