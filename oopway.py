@@ -21,6 +21,12 @@ class Vector:
         x, y, z = map(int, data.split('/'))
         return cls(x, y, z)
 
+    def __add__(self, other):
+        return Vector(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
+
+    def __sub__(self, other):
+        return Vector(self.X - other.X, self.Y - other.Y, self.Z - other.Z)
+
     def __str__(self):
         return f"{self.X}/{self.Y}/{self.Z}"
 
@@ -277,7 +283,11 @@ def make_draft(data: dict) -> DraftChoice:
     return draft_choice
 
 
+first_move = True
+
+
 def make_turn(data: dict) -> BattleOutput:
+    global first_move
     # принимаем данные
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
@@ -285,10 +295,17 @@ def make_turn(data: dict) -> BattleOutput:
     battle_output.UserCommands = []
     for ship in battle_state.My:
         # каждому отдельному кораблю даём команду двигаться на автопилоте
-        battle_output.UserCommands.append(
-            UserCommand(Command="MOVE",
-                        Parameters=MoveCommandParameters(ship.Id, Vector(15, 15, 15)))
-        )
+        if first_move:
+            battle_output.UserCommands.append(
+                UserCommand(Command="MOVE",
+                            Parameters=MoveCommandParameters(ship.Id, Vector(15, 15, ship.Position.Z)))
+            )
+            first_move = False
+        else:
+            battle_output.UserCommands.append(
+                UserCommand(Command="ACCELERATE",
+                            Parameters=AccelerateCommandParameters(ship.Id, Vector(15, 15, 15) - ship.Position))
+            )
         # ищем у отдельного корабля блок с пушкой
         guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]
         # если нашли- даём команду стрелять
