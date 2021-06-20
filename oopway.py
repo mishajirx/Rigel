@@ -27,6 +27,9 @@ class Vector:
     def __sub__(self, other):
         return Vector(self.X - other.X, self.Y - other.Y, self.Z - other.Z)
 
+    def __reversed__(self):
+        return Vector(self.X * -1, self.Y * -1, self.Z * -1)
+
     def __str__(self):
         return f"{self.X}/{self.Y}/{self.Z}"
 
@@ -272,6 +275,14 @@ class BattleState(JSONCapability):
 # endregion
 
 
+def speed_limiter(initial, limit):
+    if initial > limit:
+        return limit
+    if initial < limit * -1:
+        return limit * -1
+    return initial
+
+
 def make_draft(data: dict) -> DraftChoice:
     # принимаем данные
     draft_options = DraftOptions.from_json(data)
@@ -286,8 +297,7 @@ def make_draft(data: dict) -> DraftChoice:
 first_move = True
 
 
-def make_turn(data: dict) -> BattleOutput:
-    global first_move
+def make_turn(data: dict, is_first_move) -> BattleOutput:
     # принимаем данные
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
@@ -295,16 +305,17 @@ def make_turn(data: dict) -> BattleOutput:
     battle_output.UserCommands = []
     for ship in battle_state.My:
         # каждому отдельному кораблю даём команду двигаться на автопилоте
-        if first_move:
+        if is_first_move:
             battle_output.UserCommands.append(
                 UserCommand(Command="MOVE",
-                            Parameters=MoveCommandParameters(ship.Id, Vector(15, 15, ship.Position.Z)))
+                            Parameters=MoveCommandParameters(ship.Id, Vector(15, ship.Position.Y, 15)))
             )
-            first_move = False
         else:
             battle_output.UserCommands.append(
                 UserCommand(Command="ACCELERATE",
-                            Parameters=AccelerateCommandParameters(ship.Id, Vector(15, 15, 15) - ship.Position))
+                            Parameters=AccelerateCommandParameters(
+                                ship.Id, Vector(0, speed_limiter(15 - ship.Position.Y, 1), 0))
+                            )
             )
         # ищем у отдельного корабля блок с пушкой
         guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]
@@ -318,13 +329,15 @@ def make_turn(data: dict) -> BattleOutput:
 
 
 def play_game():
+    first_move = True
     while True:
         raw_line = input()
         line = json.loads(raw_line)
         if 'PlayerId' in line:
             print(json.dumps(make_draft(line), default=lambda x: x.to_json(), ensure_ascii=False))
         elif 'My' in line:
-            print(json.dumps(make_turn(line), default=lambda x: x.to_json(), ensure_ascii=False))
+            print(json.dumps(make_turn(line, first_move), default=lambda x: x.to_json(), ensure_ascii=False))
+            first_move = False
 
 
 if __name__ == '__main__':
