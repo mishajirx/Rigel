@@ -294,10 +294,7 @@ def make_draft(data: dict) -> DraftChoice:
     return draft_choice
 
 
-first_move = True
-
-
-def make_turn(data: dict, is_first_move) -> BattleOutput:
+def make_turn(data: dict) -> BattleOutput:
     # принимаем данные
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
@@ -305,18 +302,10 @@ def make_turn(data: dict, is_first_move) -> BattleOutput:
     battle_output.UserCommands = []
     for ship in battle_state.My:
         # каждому отдельному кораблю даём команду двигаться на автопилоте
-        if is_first_move:
-            battle_output.UserCommands.append(
-                UserCommand(Command="MOVE",
-                            Parameters=MoveCommandParameters(ship.Id, Vector(15, ship.Position.Y, 15)))
-            )
-        else:
-            battle_output.UserCommands.append(
-                UserCommand(Command="ACCELERATE",
-                            Parameters=AccelerateCommandParameters(
-                                ship.Id, Vector(0, speed_limiter(15 - ship.Position.Y, 1), 0))
-                            )
-            )
+        battle_output.UserCommands.append(
+            UserCommand(Command="MOVE",
+                        Parameters=MoveCommandParameters(ship.Id, Vector(15, ship.Position.Y, 15)))
+        )
         # ищем у отдельного корабля блок с пушкой
         guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]
         # если нашли- даём команду стрелять
@@ -336,7 +325,7 @@ def play_game():
         if 'PlayerId' in line:
             print(json.dumps(make_draft(line), default=lambda x: x.to_json(), ensure_ascii=False))
         elif 'My' in line:
-            print(json.dumps(make_turn(line, first_move), default=lambda x: x.to_json(), ensure_ascii=False))
+            print(json.dumps(make_turn(line), default=lambda x: x.to_json(), ensure_ascii=False))
             first_move = False
 
 
