@@ -294,7 +294,7 @@ def make_draft(data: dict) -> DraftChoice:
     return draft_choice
 
 
-def make_turn(data: dict) -> BattleOutput:
+def make_turn(data: dict, game_opt: DraftOptions) -> BattleOutput:
     # принимаем данные
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
@@ -319,13 +319,15 @@ def make_turn(data: dict) -> BattleOutput:
 
 def play_game():
     first_move = True
+    game_options = None
     while True:
         raw_line = input()
         line = json.loads(raw_line)
         if 'PlayerId' in line:
+            game_options = DraftOptions.from_json(line)
             print(json.dumps(make_draft(line), default=lambda x: x.to_json(), ensure_ascii=False))
         elif 'My' in line:
-            print(json.dumps(make_turn(line), default=lambda x: x.to_json(), ensure_ascii=False))
+            print(json.dumps(make_turn(line, game_options), default=lambda x: x.to_json(), ensure_ascii=False))
             first_move = False
 
 
