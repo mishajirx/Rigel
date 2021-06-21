@@ -251,7 +251,11 @@ class Ship(JSONCapability):
         return [self.Position,
                 self.Position + Vector(1, 0, 0),
                 self.Position + Vector(0, 1, 0),
-                self.Position + Vector(0, 0, 1)]
+                self.Position + Vector(0, 0, 1),
+                self.Position + Vector(1, 1, 0),
+                self.Position + Vector(0, 1, 1),
+                self.Position + Vector(1, 0, 1),
+                self.Position + Vector(1, 1, 1)]
 
 
 @dataclass
@@ -312,11 +316,11 @@ def make_draft(data: dict) -> DraftChoice:
 
 
 def make_turn(data: dict) -> BattleOutput:
+    global debug_string
     # принимаем данные
     team = game_opt.PlayerId
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
-    battle_output.Message = f"I have {len(battle_state.My)} ships and move to center of galaxy and shoot"
     battle_output.UserCommands = []
     for ship in battle_state.My:
         # каждому отдельному кораблю даём команду двигаться на автопилоте
@@ -325,10 +329,16 @@ def make_turn(data: dict) -> BattleOutput:
                         Parameters=MoveCommandParameters(ship.Id, adapt(team, Vector(15, 15, 15))))
         )
         shoot_nearest_enemy(ship, battle_state, battle_output)
+    battle_output.Message = debug_string
+    debug_string = ''
     return battle_output
 
 
+debug_string = ""
+
+
 def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
+    global debug_string
     # вибирает самый слабый корабль до которого может дострелить
     guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
     if not guns:  # нет оружия - не стреляем
@@ -340,7 +350,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
         min_vector = None
         for point in enemy.get_all_points():  # перебираем все точки
             dist_to_point = abs(point - ship.Position)  # расстояние до точки по Чебышеву
-            if gun.Radius < dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
+            if gun.Radius >= dist_to_point and dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
                 min_distance = dist_to_point
                 min_vector = point
         if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
@@ -348,6 +358,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     if not available:  # если никого не можем задеть не стреляем
         return
     best_target = sorted(available, key=lambda x: x[0])[0][1]  # враг с самым низким здоровьем
+    debug_string += '   ' + str(ship.Id) + ':' + str(available)
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
                                                                                      gun.Name,
