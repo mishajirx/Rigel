@@ -4,6 +4,8 @@ from enum import Enum
 from typing import List, Optional
 
 
+# classes
+
 class JSONCapability:
     def to_json(self):
         return {k: v if not isinstance(v, Vector) else str(v) for k, v in self.__dict__.items() if v is not None}
@@ -288,55 +290,7 @@ class BattleState(JSONCapability):
 # endregion
 
 
-def adapt(team: int, vector: Vector):
-    if team == 1:
-        return Vector(game_opt.MapSize - 2 - vector.X,
-                      game_opt.MapSize - 2 - vector.Y,
-                      game_opt.MapSize - 2 - vector.Z)
-    return vector
-
-
-def speed_limiter(initial, limit):
-    if initial > limit:
-        return limit
-    if initial < limit * -1:
-        return limit * -1
-    return initial
-
-
-def make_draft(data: dict) -> DraftChoice:
-    # принимаем данные
-    draft_options = DraftOptions.from_json(data)
-    draft_choice = DraftChoice(Message='AHAHAHA')
-    # пихаем все корабли руками (место выбирается автоматически)
-    draft_choice.Ships = []
-    for i in range(5):
-        draft_choice.Ships.append(DraftShipChoice('scout'))
-    return draft_choice
-
-
-def make_turn(data: dict) -> BattleOutput:
-    global debug_string
-    # принимаем данные
-    team = game_opt.PlayerId
-    battle_state = BattleState.from_json(data)
-    battle_output = BattleOutput()
-    battle_output.UserCommands = []
-    for ship in battle_state.My:
-        # каждому отдельному кораблю даём команду двигаться на автопилоте
-        battle_output.UserCommands.append(
-            UserCommand(Command="MOVE",
-                        Parameters=MoveCommandParameters(ship.Id, adapt(team, Vector(15, 15, 15))))
-        )
-        shoot_nearest_enemy(ship, battle_state, battle_output)
-    battle_output.Message = debug_string
-    debug_string = ''
-    return battle_output
-
-
-debug_string = ""
-
-
+# help methods
 def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     global debug_string
     # выбирает самый слабый корабль до которого может дострелить
@@ -365,16 +319,63 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
                                                                                      best_target)))
 
 
-game_opt = None
+def adapt(team: int, vector: Vector):
+    if team == 1:
+        return Vector(draft_options.MapSize - 2 - vector.X,
+                      draft_options.MapSize - 2 - vector.Y,
+                      draft_options.MapSize - 2 - vector.Z)
+    return vector
+
+
+def speed_limiter(initial, limit):
+    if initial > limit:
+        return limit
+    if initial < limit * -1:
+        return limit * -1
+    return initial
+
+
+draft_options: DraftOptions
+debug_string = ''
+
+
+def make_draft(data: dict) -> DraftChoice:
+    # принимаем данные
+    global draft_options
+    draft_options = DraftOptions.from_json(data)
+    draft_choice = DraftChoice(Message='AHAHAHA')
+    # пихаем все корабли руками (место выбирается автоматически)
+    draft_choice.Ships = []
+    for i in range(5):
+        draft_choice.Ships.append(DraftShipChoice('scout'))
+    return draft_choice
+
+
+def make_turn(data: dict) -> BattleOutput:
+    global debug_string, draft_options
+    # принимаем данные
+    team = draft_options.PlayerId
+    battle_state = BattleState.from_json(data)
+    battle_output = BattleOutput()
+    battle_output.UserCommands = []
+    for ship in battle_state.My:
+        # каждому отдельному кораблю даём команду двигаться на автопилоте
+        battle_output.UserCommands.append(
+            UserCommand(Command="MOVE",
+                        Parameters=MoveCommandParameters(ship.Id, adapt(team, Vector(15, 15, 15))))
+        )
+        shoot_nearest_enemy(ship, battle_state, battle_output)
+    battle_output.Message = debug_string
+    debug_string = ''
+    return battle_output
 
 
 def play_game():
-    global game_opt
+    global draft_options
     while True:
         raw_line = input()
         line = json.loads(raw_line)
         if 'PlayerId' in line:
-            game_opt = DraftOptions.from_json(line)
             print(json.dumps(make_draft(line), default=lambda x: x.to_json(), ensure_ascii=False))
         elif 'My' in line:
             print(json.dumps(make_turn(line), default=lambda x: x.to_json(), ensure_ascii=False))
