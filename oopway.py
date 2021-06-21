@@ -30,6 +30,9 @@ class Vector:
     def __reversed__(self):
         return Vector(self.X * -1, self.Y * -1, self.Z * -1)
 
+    def __abs__(self):
+        return max([abs(self.X), abs(self.Y), abs(self.Z)])
+
     def __str__(self):
         return f"{self.X}/{self.Y}/{self.Z}"
 
@@ -244,6 +247,12 @@ class Ship(JSONCapability):
         data['Velocity'] = Vector.from_json(data['Velocity'])
         return cls(**data)
 
+    def get_all_points(self):
+        return [self.Position,
+                self.Position + Vector(1, 0, 0),
+                self.Position + Vector(0, 1, 0),
+                self.Position + Vector(0, 0, 1)]
+
 
 @dataclass
 class FireInfo(JSONCapability):
@@ -275,6 +284,14 @@ class BattleState(JSONCapability):
 # endregion
 
 
+def adapt(team: int, vector: Vector):
+    if team == 1:
+        return Vector(game_opt.MapSize - 2 - vector.X,
+                      game_opt.MapSize - 2 - vector.Y,
+                      game_opt.MapSize - 2 - vector.Z)
+    return vector
+
+
 def speed_limiter(initial, limit):
     if initial > limit:
         return limit
@@ -294,8 +311,9 @@ def make_draft(data: dict) -> DraftChoice:
     return draft_choice
 
 
-def make_turn(data: dict, game_opt: DraftOptions) -> BattleOutput:
+def make_turn(data: dict) -> BattleOutput:
     # принимаем данные
+    team = game_opt.PlayerId
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
     battle_output.Message = f"I have {len(battle_state.My)} ships and move to center of galaxy and shoot"
@@ -304,31 +322,51 @@ def make_turn(data: dict, game_opt: DraftOptions) -> BattleOutput:
         # каждому отдельному кораблю даём команду двигаться на автопилоте
         battle_output.UserCommands.append(
             UserCommand(Command="MOVE",
-                        Parameters=MoveCommandParameters(ship.Id, Vector(15, ship.Position.Y, 15)))
+                        Parameters=MoveCommandParameters(ship.Id, adapt(team, Vector(15, 15, 15))))
         )
-        # ищем у отдельного корабля блок с пушкой
-        guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]
-        # если нашли- даём команду стрелять
-        if guns:
-            battle_output.UserCommands.append(UserCommand(Command="ATTACK",
-                                                          Parameters=AttackCommandParameters(ship.Id,
-                                                                                             guns[0].Name,
-                                                                                             Vector(15, 15, 15))))
+        shoot_nearest_enemy(ship, battle_state, battle_output)
     return battle_output
 
 
+def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
+    # вибирает самый слабый корабль до которого может дострелить
+    guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
+    if not guns:  # нет оружия - не стреляем
+        return
+    gun = guns[0]  # самое простое получение пушки TODO написать норм алгоритм
+    available = []  # список доступных целей в формате [(хп цели, вектор стрельбы)]
+    for enemy in battle_state.Opponent:
+        min_distance = 1000000  # ищем ближайшую точку врага
+        min_vector = None
+        for point in enemy.get_all_points():  # перебираем все точки
+            dist_to_point = abs(point - ship.Position)  # расстояние до точки по Чебышеву
+            if gun.Radius < dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
+                min_distance = dist_to_point
+                min_vector = point
+        if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
+            available.append((enemy.Health, min_vector))
+    if not available:  # если никого не можем задеть не стреляем
+        return
+    best_target = sorted(available, key=lambda x: x[0])[0][1]  # враг с самым низким здоровьем
+    battle_output.UserCommands.append(UserCommand(Command="ATTACK",
+                                                  Parameters=AttackCommandParameters(ship.Id,
+                                                                                     gun.Name,
+                                                                                     best_target)))
+
+
+game_opt = None
+
+
 def play_game():
-    first_move = True
-    game_options = None
+    global game_opt
     while True:
         raw_line = input()
         line = json.loads(raw_line)
         if 'PlayerId' in line:
-            game_options = DraftOptions.from_json(line)
+            game_opt = DraftOptions.from_json(line)
             print(json.dumps(make_draft(line), default=lambda x: x.to_json(), ensure_ascii=False))
         elif 'My' in line:
-            print(json.dumps(make_turn(line, game_options), default=lambda x: x.to_json(), ensure_ascii=False))
-            first_move = False
+            print(json.dumps(make_turn(line), default=lambda x: x.to_json(), ensure_ascii=False))
 
 
 if __name__ == '__main__':
