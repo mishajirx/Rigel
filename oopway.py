@@ -358,7 +358,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
     if not guns:  # нет оружия - не стреляем
         return
-    gun = guns[0]  # самое простое получение пушки TODO написать норм алгоритм
+    gun = guns[0]  # самое простое получение пушки
     available = []  # список доступных целей в формате [(хп цели, вектор стрельбы)]
     for enemy in battle_state.Opponent:
         # ищем блок, из которого будет вестись стрельба
@@ -389,7 +389,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
         min_vector = None
         for point in enemy.get_all_points():  # перебираем все точки
             dist_to_point = abs(point - gun_pos)  # расстояние до точки по Чебышеву
-            if gun.Radius >= dist_to_point and dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
+            if dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
                 min_distance = dist_to_point
                 min_vector = point
         if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
