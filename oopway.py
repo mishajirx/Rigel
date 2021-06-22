@@ -52,6 +52,7 @@ class EquipmentType(Enum):
     Engine = 2
     Health = 3
     Heal = 7
+    Shield = 4
 
 
 class EffectType(Enum):
@@ -69,16 +70,21 @@ class EquipmentBlock(JSONCapability):
 
     @classmethod
     def from_json(cls, data):
-        if EquipmentType(data['Type']) == EquipmentType.Energy:
-            return EnergyBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Gun:
-            return GunBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Engine:
-            return EngineBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Health:
-            return HealthBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Heal:
-            return
+        try:
+            if EquipmentType(data['Type']) == EquipmentType.Energy:
+                return EnergyBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Gun:
+                return GunBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Engine:
+                return EngineBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Health:
+                return HealthBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Heal:
+                return HealBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Shield:
+                return ShieldBlock(**data)
+        except Exception:
+            EngineBlock(Name='big_engine', MaxAccelerate=1, Type=EquipmentType.Engine)
 
 
 @dataclass
@@ -123,6 +129,12 @@ class HealBlock(EquipmentBlock):
     Radius: int
     HealthGain: int
     EnergyGain: int
+
+
+@dataclass
+class ShieldBlock(EquipmentBlock):
+    EnergyPrice: int
+    Armor: int
 
 
 # endregion
