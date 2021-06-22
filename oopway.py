@@ -408,6 +408,7 @@ draft_options: DraftOptions
 debug_string = ''
 WasFirstTurn = False
 targets = {}
+taken = set()
 
 
 def make_draft(data: dict) -> DraftChoice:
@@ -498,7 +499,6 @@ def make_turn(data: dict) -> BattleOutput:
     battle_output.Message = debug_string
     debug_string = ''
     return battle_output
-
 
 
 def play_game():
