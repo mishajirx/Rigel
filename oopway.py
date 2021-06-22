@@ -415,11 +415,15 @@ def make_draft(data: dict) -> DraftChoice:
     # принимаем данные
     global draft_options
     draft_options = DraftOptions.from_json(data)
-    draft_choice = DraftChoice(Message='AHAHAHA')
+    draft_choice = DraftChoice(Message=str(draft_options.Ships))
     # пихаем все корабли руками (место выбирается автоматически)
     draft_choice.Ships = []
     for i in range(5):
-        draft_choice.Ships.append(DraftShipChoice('scout'))
+        if draft_options.Money >= 50:  # ценник forward, покупаем их на все деньги
+            draft_choice.Ships.append(DraftShipChoice('forward'))
+            draft_options.Money -= 50
+        else:
+            draft_choice.Ships.append(DraftShipChoice('scout'))
     return draft_choice
 
 
@@ -432,9 +436,9 @@ def make_turn(data: dict) -> BattleOutput:
     battle_output.UserCommands = []
     for ship in battle_state.My:
         if targets.get(ship.Id, -1) not in [enemy.Id for enemy in battle_state.Opponent]:
-            # check_ships = lambda enemy: (enemy.Id in taken, abs(ship.Position - enemy.Position))
-            # targets[ship.Id] = min(battle_state.Opponent, key=check_ships)
-            targets[ship.Id] = min(battle_state.Opponent, key=lambda enemy: enemy.Health)
+            check_ships = lambda enemy: (enemy.Id in taken, abs(ship.Position - enemy.Position))
+            targets[ship.Id] = min(battle_state.Opponent, key=check_ships)
+            # targets[ship.Id] = min(battle_state.Opponent, key=lambda enemy: enemy.Health)
         target = targets[ship.Id]
         taken.add(target.Id)
         my_positions = ship.get_all_points()
@@ -444,9 +448,7 @@ def make_turn(data: dict) -> BattleOutput:
             for v2 in target_positions:
                 dist = abs(v2 - v1)
                 if dist < closest_point[0]:
-                    closest_point[0] = dist
-                    closest_point[1] = v2
-                    closest_point[2] = v1
+                    closest_point[0] = [dist, v2, v1]
 
         # ищем пушку
         guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
@@ -460,16 +462,23 @@ def make_turn(data: dict) -> BattleOutput:
         if gun.Radius < closest_point[0]:  # слишком далеко
             # каждому отдельному кораблю даём команду двигаться на автопилоте
             make_simple_move(battle_state, battle_output, ship, closest_point[1])
-            shoot_nearest_enemy(ship, battle_state, battle_output)
+            for i in range(len(guns)):
+                shoot_nearest_enemy(ship, battle_state, battle_output)
 
         elif gun.Radius == closest_point[0]:  # сейчас находимся на окубности
             # затычка
-            make_simple_move(battle_state, battle_output, ship, closest_point[1])
+            # make_simple_move(battle_state, battle_output, ship, closest_point[1])
             # shoot_nearest_enemy(ship, battle_state, battle_output)
             # затычка
+            # тормозим
             battle_output.UserCommands.append(UserCommand(
-                Command="ATTACK",
-                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
+                Command="ACCELERATE",
+                Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 0, 0) - ship.Velocity))
+            )
+            for i in range(len(guns)):
+                battle_output.UserCommands.append(UserCommand(
+                    Command="ATTACK",
+                    Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1] + Vector(0, 0, i))))
 
         else:  # слишком близко
             # затычка
@@ -494,7 +503,8 @@ def make_turn(data: dict) -> BattleOutput:
                     Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 0, 0) - escape_v - ship.Velocity))
                 )
                 # make_simple_move(battle_state, battle_output, ship, closest_point[1])
-            shoot_nearest_enemy(ship, battle_state, battle_output)
+            for i in range(len(guns)):
+                shoot_nearest_enemy(ship, battle_state, battle_output)
 
     battle_output.Message = debug_string
     debug_string = ''
