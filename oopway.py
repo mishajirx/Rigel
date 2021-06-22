@@ -69,18 +69,21 @@ class EquipmentBlock(JSONCapability):
 
     @classmethod
     def from_json(cls, data):
-        if EquipmentType(data['Type']) == EquipmentType.Energy:
-            return EnergyBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Gun:
-            return GunBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Engine:
-            return EngineBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Health:
-            return HealthBlock(**data)
-        elif EquipmentType(data['Type']) == EquipmentType.Heal:
-            return HealBlock
-        elif EquipmentType(data['Type']) == EquipmentType.Shield:
-            return ShieldBlock
+        try:
+            if EquipmentType(data['Type']) == EquipmentType.Energy:
+                return EnergyBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Gun:
+                return GunBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Engine:
+                return EngineBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Health:
+                return HealthBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Heal:
+                return HealBlock(**data)
+            elif EquipmentType(data['Type']) == EquipmentType.Shield:
+                return ShieldBlock(**data)
+        except Exception:
+            EngineBlock(Name='big_engine', MaxAccelerate=1, Type=EquipmentType.Engine)
 
 
 @dataclass
@@ -125,14 +128,12 @@ class HealBlock(EquipmentBlock):
     Radius: int
     HealthGain: int
     EnergyGain: int
-    Type = EquipmentType.Heal
 
 
-@dataclass()
+@dataclass
 class ShieldBlock(EquipmentBlock):
     EnergyPrice: int
     Armor: int
-    Type = EquipmentType.Shield
 
 
 # endregion
@@ -389,7 +390,7 @@ def choose_gun(ship):
     return guns[0]  # самое простое получение пушки
 
 
-def shoot_target_enemy(ship: Ship, enemy_target: Ship, battle_state, battle_output):
+def shoot_target_enemy(ship, enemy_target, battle_state, battle_output):
     global debug_string
     gun = choose_gun(ship)
     # ищем блок, из которого будет вестись стрельба
@@ -410,7 +411,7 @@ def shoot_target_enemy(ship: Ship, enemy_target: Ship, battle_state, battle_outp
         battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                       Parameters=AttackCommandParameters(ship.Id,
                                                                                          gun.Name,
-                                                                                         enemy_target.Position)))
+                                                                                         min_vector + Vector(1, 0, 0))))
         return
     shoot_nearest_enemy(ship, battle_state, battle_output)
     return
@@ -458,11 +459,10 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
                 min_distance = dist_to_point
                 min_vector = point
         if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
-            available.append((enemy.Health, min_vector, enemy))
+            available.append((enemy.Health, min_vector))
     if not available:  # если никого не можем задеть не стреляем
         return
     best_target = sorted(available, key=lambda x: x[0])[0][1]  # враг с самым низким здоровьем
-    enemy_target = sorted(available, key=lambda x: x[0])[0][2]
     debug_string += '   ' + str(ship.Id) + ':' + str(available)
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
@@ -471,7 +471,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
                                                                                      gun.Name,
-                                                                                     enemy_target.Position)))
+                                                                                     best_target + Vector(1, 0, 0))))
 
 
 draft_options: DraftOptions
@@ -505,19 +505,32 @@ def make_turn(data: dict) -> BattleOutput:
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
     battle_output.UserCommands = []
-    if cnt < 5:
+    k = 1 if draft_options.PlayerId == 0 else -1
+    if cnt < 4:
         for ship in battle_state.My:
-            k = draft_options.PlayerId * draft_options.MapSize
             if ship.Id % 2 == 0:
                 battle_output.UserCommands.append(UserCommand(
-                    Command="MOVE",
-                    Parameters=MoveCommandParameters(ship.Id, Vector(k - 30, 0, k - 30)))
-                )
+                    Command="ACCELERATE",
+                    Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 0, 1 * k) - ship.Velocity)
+                ))
             else:
                 battle_output.UserCommands.append(UserCommand(
-                    Command="MOVE",
-                    Parameters=MoveCommandParameters(ship.Id, Vector(0, k - 30, k - 30)))
-                )
+                    Command="ACCELERATE",
+                    Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 1 * k, 0) - ship.Velocity)
+                ))
+        return battle_output
+    if cnt == 4:
+        for ship in battle_state.My:
+            if ship.Id % 2 == 0:
+                battle_output.UserCommands.append(UserCommand(
+                    Command="ACCELERATE",
+                    Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 0, 0) - ship.Velocity)
+                ))
+            else:
+                battle_output.UserCommands.append(UserCommand(
+                    Command="ACCELERATE",
+                    Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 0, 0) - ship.Velocity)
+                ))
         return battle_output
 
     for ship in battle_state.My:
@@ -584,6 +597,7 @@ def make_turn(data: dict) -> BattleOutput:
                 # make_simple_move(battle_state, battle_output, ship, closest_point[1])
             shoot_nearest_enemy(ship, battle_state, battle_output)
 
+
     battle_output.Message = debug_string
     debug_string = ''
     return battle_output
@@ -598,7 +612,7 @@ def play_game():
             print(json.dumps(make_draft(line), default=lambda x: x.to_json(), ensure_ascii=False))
         elif 'My' in line:
             print(json.dumps(make_turn(line), default=lambda x: x.to_json(), ensure_ascii=False))
-        cnt += 1
+            cnt += 1
 
 
 if __name__ == '__main__':
