@@ -330,18 +330,6 @@ def plotLine3d(x0: int, y0: int, z0: int, x1: int, y1: int, z1: int) -> List:
     return res
 
 
-def get_all_positions(v: Vector) -> List[Vector]:
-    res = [v + Vector(0, 0, 0),
-           v + Vector(0, 0, 1),
-           v + Vector(0, 1, 0),
-           v + Vector(0, 1, 1),
-           v + Vector(1, 0, 0),
-           v + Vector(1, 0, 1),
-           v + Vector(1, 1, 0),
-           v + Vector(1, 1, 1)]
-    return res
-
-
 def adapt(team: int, vector: Vector):
     if team == 1:
         return Vector(draft_options.MapSize - 2 - vector.X,
@@ -422,8 +410,8 @@ def make_turn(data: dict) -> BattleOutput:
         if targets.get(ship.Id, -1) not in [enemy.Id for enemy in battle_state.Opponent]:
             targets[ship.Id] = min(battle_state.Opponent, key=lambda enemy: abs(ship.Position - enemy.Position))
         target = targets[ship.Id]
-        my_positions = get_all_positions(ship.Position)
-        target_positions = get_all_positions(target.Position)
+        my_positions = ship.get_all_points()
+        target_positions = target.get_all_points()
         closest_point = [draft_options.MapSize, target_positions[0], my_positions[0]]
         for v1 in my_positions:
             for v2 in target_positions:
@@ -450,6 +438,7 @@ def make_turn(data: dict) -> BattleOutput:
             make_simple_move(battle_state, battle_output, ship, closest_point[1])
             shoot_nearest_enemy(ship, battle_state, battle_output)
             # затычка
+            UserCommand
 
         else:  # слишком близко
             # затычка
