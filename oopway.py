@@ -1,4 +1,5 @@
 import json
+from random import choice
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
@@ -50,6 +51,7 @@ class EquipmentType(Enum):
     Gun = 1
     Engine = 2
     Health = 3
+    Heal = 7
 
 
 class EffectType(Enum):
@@ -75,6 +77,8 @@ class EquipmentBlock(JSONCapability):
             return EngineBlock(**data)
         elif EquipmentType(data['Type']) == EquipmentType.Health:
             return HealthBlock(**data)
+        elif EquipmentType(data['Type']) == EquipmentType.Heal:
+            return
 
 
 @dataclass
@@ -111,6 +115,14 @@ class EffectType(EquipmentBlock):
     MaxHealth: int
     StartHealth: int
     Type = EquipmentType.Health
+
+
+@dataclass
+class HealBlock(EquipmentBlock):
+    EnergyPrice: int
+    Radius: int
+    HealthGain: int
+    EnergyGain: int
 
 
 # endregion
@@ -367,12 +379,10 @@ def choose_gun(ship):
     return guns[0]  # самое простое получение пушки
 
 
-def shoot_target_enemy(ship, enemy_target, battle_state, battle_output):
+def shoot_target_enemy(ship: Ship, enemy_target: Ship, battle_state, battle_output):
     global debug_string
     gun = choose_gun(ship)
     # ищем блок, из которого будет вестись стрельба
-    ships_interposition = enemy_target.Position - ship.Position  # взаимоположение кораблей
-    # пространство вокруг корабля на 8 частей, каждая для своего блока(как геометрические четверти в 3D)
     gun_pos = ship.Position
     min_distance = 1000000  # ищем ближайшую точку врага
     min_vector = None
@@ -390,7 +400,7 @@ def shoot_target_enemy(ship, enemy_target, battle_state, battle_output):
         battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                       Parameters=AttackCommandParameters(ship.Id,
                                                                                          gun.Name,
-                                                                                         min_vector + Vector(1, 0, 0))))
+                                                                                         enemy_target.Position)))
         return
     shoot_nearest_enemy(ship, battle_state, battle_output)
     return
@@ -438,10 +448,11 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
                 min_distance = dist_to_point
                 min_vector = point
         if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
-            available.append((enemy.Health, min_vector))
+            available.append((enemy.Health, min_vector, enemy))
     if not available:  # если никого не можем задеть не стреляем
         return
     best_target = sorted(available, key=lambda x: x[0])[0][1]  # враг с самым низким здоровьем
+    enemy_target = sorted(available, key=lambda x: x[0])[0][2]
     debug_string += '   ' + str(ship.Id) + ':' + str(available)
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
@@ -450,7 +461,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
                                                                                      gun.Name,
-                                                                                     best_target + Vector(1, 0, 0))))
+                                                                                     enemy_target.Position)))
 
 
 draft_options: DraftOptions
@@ -520,12 +531,7 @@ def make_turn(data: dict) -> BattleOutput:
             make_simple_move(battle_state, battle_output, ship, closest_point[1])
             # shoot_nearest_enemy(ship, battle_state, battle_output)
             # затычка
-            battle_output.UserCommands.append(UserCommand(
-                Command="ATTACK",
-                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1] + Vector(1, 0, 0))))
-            battle_output.UserCommands.append(UserCommand(
-                Command="ATTACK",
-                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1] + Vector(1, 0, 0))))
+            shoot_target_enemy(ship, target, battle_state, battle_output)
 
         else:  # слишком близко
             # затычка
