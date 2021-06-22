@@ -360,6 +360,42 @@ def make_simple_move(battle_state: BattleState, battle_output: BattleOutput, shi
                     Parameters=MoveCommandParameters(ship.Id, point)))
 
 
+def choose_gun(ship):
+    guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
+    if not guns:  # нет оружия - не стреляем
+        return
+    return guns[0]  # самое простое получение пушки
+
+
+def shoot_target_enemy(ship, enemy_target, battle_state, battle_output):
+    global debug_string
+    gun = choose_gun(ship)
+    # ищем блок, из которого будет вестись стрельба
+    ships_interposition = enemy_target.Position - ship.Position  # взаимоположение кораблей
+    # пространство вокруг корабля на 8 частей, каждая для своего блока(как геометрические четверти в 3D)
+    gun_pos = ship.Position
+    min_distance = 1000000  # ищем ближайшую точку врага
+    min_vector = None
+    for point in enemy_target.get_all_points():  # перебираем все точки
+        dist_to_point = abs(point - gun_pos)  # расстояние до точки по Чебышеву
+        if dist_to_point <= gun.Radius + 4 and dist_to_point < min_distance:
+            # если можем дострелить и точка ближе всех остальных
+            min_distance = dist_to_point
+            min_vector = point
+    if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
+        battle_output.UserCommands.append(UserCommand(Command="ATTACK",
+                                                      Parameters=AttackCommandParameters(ship.Id,
+                                                                                         gun.Name,
+                                                                                         min_vector)))
+        battle_output.UserCommands.append(UserCommand(Command="ATTACK",
+                                                      Parameters=AttackCommandParameters(ship.Id,
+                                                                                         gun.Name,
+                                                                                         min_vector + Vector(1, 0, 0))))
+        return
+    shoot_nearest_enemy(ship, battle_state, battle_output)
+    return
+
+
 def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     global debug_string
     # вибирает самый слабый корабль до которого может дострелить
@@ -428,7 +464,7 @@ def make_draft(data: dict) -> DraftChoice:
     # принимаем данные
     global draft_options
     draft_options = DraftOptions.from_json(data)
-    draft_choice = DraftChoice(Message=str(draft_options.Ships))
+    draft_choice = DraftChoice(Message=str(draft_options))
     # пихаем все корабли руками (место выбирается автоматически)
     draft_choice.Ships = []
     for i in range(5):
@@ -505,13 +541,13 @@ def make_turn(data: dict) -> BattleOutput:
             test = ship.Position + escape_v
             if test.X <= draft_options.MapSize and test.Y <= draft_options.MapSize and test.Z <= draft_options.MapSize:
                 battle_output.UserCommands.append(UserCommand(
-                    Command="ACCELERATE",
-                    Parameters=AccelerateCommandParameters(ship.Id, escape_v - ship.Velocity))
+                    Command="MOVE",
+                    Parameters=MoveCommandParameters(ship.Id, escape_v - ship.Velocity))
                 )
             else:
                 battle_output.UserCommands.append(UserCommand(
-                    Command="ACCELERATE",
-                    Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 0, 0) - escape_v - ship.Velocity))
+                    Command="MOVE",
+                    Parameters=MoveCommandParameters(ship.Id, Vector(0, 0, 0) - escape_v - ship.Velocity))
                 )
                 # make_simple_move(battle_state, battle_output, ship, closest_point[1])
             shoot_nearest_enemy(ship, battle_state, battle_output)
