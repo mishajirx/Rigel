@@ -389,7 +389,8 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
         min_vector = None
         for point in enemy.get_all_points():  # перебираем все точки
             dist_to_point = abs(point - gun_pos)  # расстояние до точки по Чебышеву
-            if dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
+            if dist_to_point <= gun.Radius + 3 and dist_to_point < min_distance:
+                # если можем дострелить и точка ближе всех остальных
                 min_distance = dist_to_point
                 min_vector = point
         if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
@@ -402,23 +403,32 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
                                                   Parameters=AttackCommandParameters(ship.Id,
                                                                                      gun.Name,
                                                                                      best_target)))
+    battle_output.UserCommands.append(UserCommand(Command="ATTACK",
+                                                  Parameters=AttackCommandParameters(ship.Id,
+                                                                                     gun.Name,
+                                                                                     best_target)))
 
 
 draft_options: DraftOptions
 debug_string = ''
 WasFirstTurn = False
 targets = {}
+taken = set()
 
 
 def make_draft(data: dict) -> DraftChoice:
     # принимаем данные
     global draft_options
     draft_options = DraftOptions.from_json(data)
-    draft_choice = DraftChoice(Message='AHAHAHA')
+    draft_choice = DraftChoice(Message=str(draft_options.Ships))
     # пихаем все корабли руками (место выбирается автоматически)
     draft_choice.Ships = []
     for i in range(5):
-        draft_choice.Ships.append(DraftShipChoice('scout'))
+        if draft_options.Money >= 50:  # ценник forward, покупаем их на все деньги
+            draft_choice.Ships.append(DraftShipChoice('forward'))
+            draft_options.Money -= 50
+        else:
+            draft_choice.Ships.append(DraftShipChoice('scout'))
     return draft_choice
 
 
@@ -469,6 +479,9 @@ def make_turn(data: dict) -> BattleOutput:
             battle_output.UserCommands.append(UserCommand(
                 Command="ATTACK",
                 Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
+            battle_output.UserCommands.append(UserCommand(
+                Command="ATTACK",
+                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
 
         else:  # слишком близко
             # затычка
@@ -497,8 +510,10 @@ def make_turn(data: dict) -> BattleOutput:
 
     battle_output.Message = debug_string
     debug_string = ''
+    battle_output.UserCommands.append(UserCommand(
+        Command="ATTACK",
+        Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
     return battle_output
-
 
 
 def play_game():
