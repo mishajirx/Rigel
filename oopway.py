@@ -424,6 +424,7 @@ def make_draft(data: dict) -> DraftChoice:
             draft_options.Money -= 50
         else:
             draft_choice.Ships.append(DraftShipChoice('scout'))
+    draft_choice.Message = str(draft_options.StartArea.From) + ' ' + str(draft_options.StartArea.To)
     return draft_choice
 
 
