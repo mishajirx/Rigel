@@ -408,6 +408,7 @@ draft_options: DraftOptions
 debug_string = ''
 WasFirstTurn = False
 targets = {}
+taken = set()
 
 
 def make_draft(data: dict) -> DraftChoice:
@@ -431,8 +432,11 @@ def make_turn(data: dict) -> BattleOutput:
     battle_output.UserCommands = []
     for ship in battle_state.My:
         if targets.get(ship.Id, -1) not in [enemy.Id for enemy in battle_state.Opponent]:
-            targets[ship.Id] = min(battle_state.Opponent, key=lambda enemy: abs(ship.Position - enemy.Position))
+            # check_ships = lambda enemy: (enemy.Id in taken, abs(ship.Position - enemy.Position))
+            # targets[ship.Id] = min(battle_state.Opponent, key=check_ships)
+            targets[ship.Id] = min(battle_state.Opponent, key=lambda enemy: enemy.Health)
         target = targets[ship.Id]
+        taken.add(target.Id)
         my_positions = ship.get_all_points()
         target_positions = target.get_all_points()
         closest_point = [draft_options.MapSize, target_positions[0], my_positions[0]]
@@ -467,7 +471,6 @@ def make_turn(data: dict) -> BattleOutput:
                 Command="ATTACK",
                 Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
 
-
         else:  # слишком близко
             # затычка
             # make_simple_move(battle_state, battle_output, ship, closest_point[1])
@@ -479,10 +482,18 @@ def make_turn(data: dict) -> BattleOutput:
                 escape_v.Y = engine.MaxAccelerate * (1 if escape_v.Y > 0 else -1)
             if abs(escape_v.Z) > engine.MaxAccelerate:
                 escape_v.Z = engine.MaxAccelerate * (1 if escape_v.Z > 0 else -1)
-            battle_output.UserCommands.append(UserCommand(
-                Command="ACCELERATE",
-                Parameters=AccelerateCommandParameters(ship.Id, escape_v - ship.Velocity))
-            )
+            test = ship.Position + escape_v
+            if test.X <= draft_options.MapSize and test.Y <= draft_options.MapSize and test.Z <= draft_options.MapSize:
+                battle_output.UserCommands.append(UserCommand(
+                    Command="ACCELERATE",
+                    Parameters=AccelerateCommandParameters(ship.Id, escape_v - ship.Velocity))
+                )
+            else:
+                battle_output.UserCommands.append(UserCommand(
+                    Command="ACCELERATE",
+                    Parameters=AccelerateCommandParameters(ship.Id, Vector(0, 0, 0) - escape_v - ship.Velocity))
+                )
+                # make_simple_move(battle_state, battle_output, ship, closest_point[1])
             shoot_nearest_enemy(ship, battle_state, battle_output)
 
     battle_output.Message = debug_string
