@@ -346,10 +346,34 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     gun = guns[0]  # самое простое получение пушки TODO написать норм алгоритм
     available = []  # список доступных целей в формате [(хп цели, вектор стрельбы)]
     for enemy in battle_state.Opponent:
+        # ищем блок, из которого будет вестись стрельба
+        ships_interposition = enemy.Position - ship.Position  # взаимоположение кораблей
+        # пространство вокруг корабля на 8 частей, каждая для своего блока(как геометрические четверти в 3D)
+        gun_pos = ship.Position
+        if ships_interposition.X >= 0 and ships_interposition.Y >= 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(0, 0, 1)
+            else:
+                gun_pos = ship.Position
+        elif ships_interposition.X >= 0 and ships_interposition.Y < 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(0, 1, 1)
+            else:
+                gun_pos = ship.Position + Vector(0, 1, 0)
+        elif ships_interposition.X < 0 and ships_interposition.Y >= 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(1, 0, 1)
+            else:
+                gun_pos = ship.Position + Vector(1, 0, 0)
+        elif ships_interposition.X < 0 and ships_interposition.Y < 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(1, 1, 1)
+            else:
+                gun_pos = ship.Position + Vector(1, 1, 0)
         min_distance = 1000000  # ищем ближайшую точку врага
         min_vector = None
         for point in enemy.get_all_points():  # перебираем все точки
-            dist_to_point = abs(point - ship.Position)  # расстояние до точки по Чебышеву
+            dist_to_point = abs(point - gun_pos)  # расстояние до точки по Чебышеву
             if gun.Radius >= dist_to_point and dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
                 min_distance = dist_to_point
                 min_vector = point
