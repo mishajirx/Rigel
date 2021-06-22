@@ -352,21 +352,44 @@ def make_simple_move(battle_state: BattleState, battle_output: BattleOutput, shi
                     Parameters=MoveCommandParameters(ship.Id, point)))
 
 
-def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output: BattleOutput):
+def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     global debug_string
-    # выбирает самый слабый корабль до которого может дострелить
+    # вибирает самый слабый корабль до которого может дострелить
     guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
     if not guns:  # нет оружия - не стреляем
         return
     gun = guns[0]  # самое простое получение пушки TODO написать норм алгоритм
     available = []  # список доступных целей в формате [(хп цели, вектор стрельбы)]
     for enemy in battle_state.Opponent:
+        # ищем блок, из которого будет вестись стрельба
+        ships_interposition = enemy.Position - ship.Position  # взаимоположение кораблей
+        # пространство вокруг корабля на 8 частей, каждая для своего блока(как геометрические четверти в 3D)
+        gun_pos = ship.Position
+        if ships_interposition.X >= 0 and ships_interposition.Y >= 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(0, 0, 1)
+            else:
+                gun_pos = ship.Position
+        elif ships_interposition.X >= 0 and ships_interposition.Y < 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(0, 1, 1)
+            else:
+                gun_pos = ship.Position + Vector(0, 1, 0)
+        elif ships_interposition.X < 0 and ships_interposition.Y >= 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(1, 0, 1)
+            else:
+                gun_pos = ship.Position + Vector(1, 0, 0)
+        elif ships_interposition.X < 0 and ships_interposition.Y < 0:
+            if ships_interposition.Z >= 0:
+                gun_pos = ship.Position + Vector(1, 1, 1)
+            else:
+                gun_pos = ship.Position + Vector(1, 1, 0)
         min_distance = 1000000  # ищем ближайшую точку врага
         min_vector = None
         for point in enemy.get_all_points():  # перебираем все точки
-            dist_to_point = abs(point - ship.Position)  # расстояние до точки по Чебышеву
-            # если можем дострелить и точка ближе всех остальных
-            if gun.Radius >= dist_to_point and dist_to_point < min_distance:
+            dist_to_point = abs(point - gun_pos)  # расстояние до точки по Чебышеву
+            if gun.Radius >= dist_to_point and dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
                 min_distance = dist_to_point
                 min_vector = point
         if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
