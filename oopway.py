@@ -5,7 +5,6 @@ from typing import List, Optional
 
 
 # classes
-
 class JSONCapability:
     def to_json(self):
         return {k: v if not isinstance(v, Vector) else str(v) for k, v in self.__dict__.items() if v is not None}
@@ -22,6 +21,9 @@ class Vector:
     def from_json(cls, data):
         x, y, z = map(int, data.split('/'))
         return cls(x, y, z)
+
+    def clen(self):
+        return abs(self)
 
     def __add__(self, other):
         return Vector(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
@@ -291,32 +293,53 @@ class BattleState(JSONCapability):
 
 
 # help methods
-def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
-    global debug_string
-    # выбирает самый слабый корабль до которого может дострелить
-    guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
-    if not guns:  # нет оружия - не стреляем
-        return
-    gun = guns[0]  # самое простое получение пушки TODO написать норм алгоритм
-    available = []  # список доступных целей в формате [(хп цели, вектор стрельбы)]
-    for enemy in battle_state.Opponent:
-        min_distance = 1000000  # ищем ближайшую точку врага
-        min_vector = None
-        for point in enemy.get_all_points():  # перебираем все точки
-            dist_to_point = abs(point - ship.Position)  # расстояние до точки по Чебышеву
-            if gun.Radius >= dist_to_point and dist_to_point < min_distance:  # если можем дострелить и точка ближе всех остальных
-                min_distance = dist_to_point
-                min_vector = point
-        if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
-            available.append((enemy.Health, min_vector))
-    if not available:  # если никого не можем задеть не стреляем
-        return
-    best_target = sorted(available, key=lambda x: x[0])[0][1]  # враг с самым низким здоровьем
-    debug_string += '   ' + str(ship.Id) + ':' + str(available)
-    battle_output.UserCommands.append(UserCommand(Command="ATTACK",
-                                                  Parameters=AttackCommandParameters(ship.Id,
-                                                                                     gun.Name,
-                                                                                     best_target)))
+def plotLine3d(x0: int, y0: int, z0: int, x1: int, y1: int, z1: int) -> List:
+    res = []
+    dx = abs(x1 - x0)
+    if x0 < x1:
+        sx = 1
+    else:
+        sx = -1
+    dy = abs(y1 - y0)
+    if y0 < y1:
+        sy = 1
+    else:
+        sy = -1
+    dz = abs(z1 - z0)
+    if z0 < z1:
+        sz = 1
+    else:
+        sz = -1
+    dm = max(dx, dy, dz)
+    x1 = y1 = z1 = dm // 2
+    for i in range(dm):
+        res.append((x0, y0, z0))
+        # setPixel(x0,y0,z0);
+        x1 -= dx
+        if x1 < 0:
+            x1 += dm
+            x0 += sx
+        y1 -= dy
+        if y1 < 0:
+            y1 += dm
+            y0 += sy
+        z1 -= dz
+        if z1 < 0:
+            z1 += dm
+            z0 += sz
+    return res
+
+
+def get_all_positions(v: Vector) -> List[Vector]:
+    res = [v + Vector(0, 0, 0),
+           v + Vector(0, 0, 1),
+           v + Vector(0, 1, 0),
+           v + Vector(0, 1, 1),
+           v + Vector(1, 0, 0),
+           v + Vector(1, 0, 1),
+           v + Vector(1, 1, 0),
+           v + Vector(1, 1, 1)]
+    return res
 
 
 def adapt(team: int, vector: Vector):
@@ -335,8 +358,45 @@ def speed_limiter(initial, limit):
     return initial
 
 
+def make_simple_move(battle_state: BattleState, battle_output: BattleOutput, ship: Ship, point: Vector):
+    battle_output.UserCommands.append(
+        UserCommand(Command="MOVE",
+                    Parameters=MoveCommandParameters(ship.Id, point)))
+
+
+def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output: BattleOutput):
+    global debug_string
+    # выбирает самый слабый корабль до которого может дострелить
+    guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
+    if not guns:  # нет оружия - не стреляем
+        return
+    gun = guns[0]  # самое простое получение пушки TODO написать норм алгоритм
+    available = []  # список доступных целей в формате [(хп цели, вектор стрельбы)]
+    for enemy in battle_state.Opponent:
+        min_distance = 1000000  # ищем ближайшую точку врага
+        min_vector = None
+        for point in enemy.get_all_points():  # перебираем все точки
+            dist_to_point = abs(point - ship.Position)  # расстояние до точки по Чебышеву
+            # если можем дострелить и точка ближе всех остальных
+            if gun.Radius >= dist_to_point and dist_to_point < min_distance:
+                min_distance = dist_to_point
+                min_vector = point
+        if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
+            available.append((enemy.Health, min_vector))
+    if not available:  # если никого не можем задеть не стреляем
+        return
+    best_target = sorted(available, key=lambda x: x[0])[0][1]  # враг с самым низким здоровьем
+    debug_string += '   ' + str(ship.Id) + ':' + str(available)
+    battle_output.UserCommands.append(UserCommand(Command="ATTACK",
+                                                  Parameters=AttackCommandParameters(ship.Id,
+                                                                                     gun.Name,
+                                                                                     best_target)))
+
+
 draft_options: DraftOptions
 debug_string = ''
+WasFirstTurn = False
+targets = {}
 
 
 def make_draft(data: dict) -> DraftChoice:
@@ -352,19 +412,50 @@ def make_draft(data: dict) -> DraftChoice:
 
 
 def make_turn(data: dict) -> BattleOutput:
-    global debug_string, draft_options
+    global debug_string, draft_options, targets
     # принимаем данные
     team = draft_options.PlayerId
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
     battle_output.UserCommands = []
     for ship in battle_state.My:
-        # каждому отдельному кораблю даём команду двигаться на автопилоте
-        battle_output.UserCommands.append(
-            UserCommand(Command="MOVE",
-                        Parameters=MoveCommandParameters(ship.Id, adapt(team, Vector(15, 15, 15))))
-        )
-        shoot_nearest_enemy(ship, battle_state, battle_output)
+        if targets.get(ship.Id, -1) not in [enemy.Id for enemy in battle_state.Opponent]:
+            targets[ship.Id] = min(battle_state.Opponent, key=lambda enemy: abs(ship.Position - enemy.Position))
+        target = targets[ship.Id]
+        my_positions = get_all_positions(ship.Position)
+        target_positions = get_all_positions(target.Position)
+        closest_point = [draft_options.MapSize, target_positions[0], my_positions[0]]
+        for v1 in my_positions:
+            for v2 in target_positions:
+                dist = abs(v2 - v1)
+                if dist < closest_point[0]:
+                    closest_point[0] = dist
+                    closest_point[1] = v2
+                    closest_point[2] = v1
+
+        # ищем пушку
+        guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
+        if not guns:
+            make_simple_move(battle_state, battle_output, ship, closest_point[1])
+            continue
+        gun = guns[0]
+
+        if gun.Radius < closest_point[0]:  # слишком далеко
+            # каждому отдельному кораблю даём команду двигаться на автопилоте
+            make_simple_move(battle_state, battle_output, ship, closest_point[1])
+            shoot_nearest_enemy(ship, battle_state, battle_output)
+
+        elif gun.Radius == closest_point[0]:  # сейчас находимся на окубности
+            # затычка
+            make_simple_move(battle_state, battle_output, ship, closest_point[1])
+            shoot_nearest_enemy(ship, battle_state, battle_output)
+            # затычка
+
+        else:  # слишком близко
+            # затычка
+            make_simple_move(battle_state, battle_output, ship, closest_point[1])
+            shoot_nearest_enemy(ship, battle_state, battle_output)
+            # затычка
     battle_output.Message = debug_string
     debug_string = ''
     return battle_output
