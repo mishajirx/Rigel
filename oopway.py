@@ -52,6 +52,7 @@ class EquipmentType(Enum):
     Engine = 2
     Health = 3
     Heal = 7
+    Shield = 4
 
 
 class EffectType(Enum):
@@ -59,7 +60,6 @@ class EffectType(Enum):
 
     def __init__(self, b_type):
         self.Blaster = b_type
-
 
 
 @dataclass
@@ -78,7 +78,9 @@ class EquipmentBlock(JSONCapability):
         elif EquipmentType(data['Type']) == EquipmentType.Health:
             return HealthBlock(**data)
         elif EquipmentType(data['Type']) == EquipmentType.Heal:
-            return
+            return HealBlock
+        elif EquipmentType(data['Type']) == EquipmentType.Shield:
+            return ShieldBlock
 
 
 @dataclass
@@ -123,6 +125,14 @@ class HealBlock(EquipmentBlock):
     Radius: int
     HealthGain: int
     EnergyGain: int
+    Type = EquipmentType.Heal
+
+
+@dataclass()
+class ShieldBlock(EquipmentBlock):
+    EnergyPrice: int
+    Armor: int
+    Type = EquipmentType.Shield
 
 
 # endregion
@@ -469,6 +479,7 @@ debug_string = ''
 WasFirstTurn = False
 targets = {}
 taken = set()
+cnt = 0
 
 
 def make_draft(data: dict) -> DraftChoice:
@@ -488,12 +499,27 @@ def make_draft(data: dict) -> DraftChoice:
 
 
 def make_turn(data: dict) -> BattleOutput:
-    global debug_string, draft_options, targets
+    global debug_string, draft_options, targets, cnt
     # принимаем данные
     team = draft_options.PlayerId
     battle_state = BattleState.from_json(data)
     battle_output = BattleOutput()
     battle_output.UserCommands = []
+    if cnt < 5:
+        for ship in battle_state.My:
+            k = draft_options.PlayerId * draft_options.MapSize
+            if ship.Id % 2 == 0:
+                battle_output.UserCommands.append(UserCommand(
+                    Command="MOVE",
+                    Parameters=MoveCommandParameters(ship.Id, Vector(k - 30, 0, k - 30)))
+                )
+            else:
+                battle_output.UserCommands.append(UserCommand(
+                    Command="MOVE",
+                    Parameters=MoveCommandParameters(ship.Id, Vector(0, k - 30, k - 30)))
+                )
+        return battle_output
+
     for ship in battle_state.My:
         if targets.get(ship.Id, -1) not in [enemy.Id for enemy in battle_state.Opponent]:
             # check_ships = lambda enemy: (enemy.Id in taken, abs(ship.Position - enemy.Position))
@@ -564,7 +590,7 @@ def make_turn(data: dict) -> BattleOutput:
 
 
 def play_game():
-    global draft_options
+    global draft_options, cnt
     while True:
         raw_line = input()
         line = json.loads(raw_line)
@@ -572,6 +598,7 @@ def play_game():
             print(json.dumps(make_draft(line), default=lambda x: x.to_json(), ensure_ascii=False))
         elif 'My' in line:
             print(json.dumps(make_turn(line), default=lambda x: x.to_json(), ensure_ascii=False))
+        cnt += 1
 
 
 if __name__ == '__main__':
