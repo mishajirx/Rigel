@@ -270,9 +270,13 @@ class FireInfo(JSONCapability):
 
     @classmethod
     def from_json(cls, data):
-        data['Source'] = Vector.from_json(data['Source'])
-        data['Target'] = Vector.from_json(data['Target'])
-        return cls(**data)
+        try:
+            data['Source'] = Vector.from_json(data['Source'])
+            data['Target'] = Vector.from_json(data['Target'])
+        except Exception as e:
+            pass
+        finally:
+            return cls(**data)
 
 
 @dataclass
