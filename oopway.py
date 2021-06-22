@@ -55,6 +55,10 @@ class EquipmentType(Enum):
 class EffectType(Enum):
     Blaster = 0
 
+    def __init__(self, b_type):
+        self.Blaster = b_type
+
+
 
 @dataclass
 class EquipmentBlock(JSONCapability):
@@ -274,9 +278,9 @@ class FireInfo(JSONCapability):
             data['Source'] = Vector.from_json(data['Source'])
             data['Target'] = Vector.from_json(data['Target'])
         except Exception as e:
-            pass
-        finally:
-            return cls(**data)
+            data['Source'] = Vector(0, 0, 0)
+            data['Target'] = Vector(0, 0, 0)
+        return cls(**data)
 
 
 @dataclass
@@ -410,7 +414,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
                                                                                      gun.Name,
-                                                                                     best_target)))
+                                                                                     best_target + Vector(1, 0, 0))))
 
 
 draft_options: DraftOptions
@@ -482,10 +486,10 @@ def make_turn(data: dict) -> BattleOutput:
             # затычка
             battle_output.UserCommands.append(UserCommand(
                 Command="ATTACK",
-                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
+                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1] + Vector(1, 0, 0))))
             battle_output.UserCommands.append(UserCommand(
                 Command="ATTACK",
-                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
+                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1] + Vector(1, 0, 0))))
 
         else:  # слишком близко
             # затычка
@@ -514,9 +518,6 @@ def make_turn(data: dict) -> BattleOutput:
 
     battle_output.Message = debug_string
     debug_string = ''
-    battle_output.UserCommands.append(UserCommand(
-        Command="ATTACK",
-        Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
     return battle_output
 
 
