@@ -446,6 +446,8 @@ def make_turn(data: dict) -> BattleOutput:
 
         # ищем пушку
         guns = [x for x in ship.Equipment if isinstance(x, GunBlock)]  # берем все блоки оружия
+        engines = [x for x in ship.Equipment if isinstance(x, EngineBlock)]
+        engine = engines[0]
         if not guns:
             make_simple_move(battle_state, battle_output, ship, closest_point[1])
             continue
@@ -459,15 +461,30 @@ def make_turn(data: dict) -> BattleOutput:
         elif gun.Radius == closest_point[0]:  # сейчас находимся на окубности
             # затычка
             make_simple_move(battle_state, battle_output, ship, closest_point[1])
-            shoot_nearest_enemy(ship, battle_state, battle_output)
+            # shoot_nearest_enemy(ship, battle_state, battle_output)
             # затычка
-            UserCommand
+            battle_output.UserCommands.append(UserCommand(
+                Command="ATTACK",
+                Parameters=AttackCommandParameters(ship.Id, gun.Name, closest_point[1])))
+
 
         else:  # слишком близко
             # затычка
-            make_simple_move(battle_state, battle_output, ship, closest_point[1])
-            shoot_nearest_enemy(ship, battle_state, battle_output)
+            # make_simple_move(battle_state, battle_output, ship, closest_point[1])
             # затычка
+            escape_v = closest_point[2] - closest_point[1]
+            if abs(escape_v.X) > engine.MaxAccelerate:
+                escape_v.X = engine.MaxAccelerate * (1 if escape_v.X > 0 else -1)
+            if abs(escape_v.Y) > engine.MaxAccelerate:
+                escape_v.Y = engine.MaxAccelerate * (1 if escape_v.Y > 0 else -1)
+            if abs(escape_v.Z) > engine.MaxAccelerate:
+                escape_v.Z = engine.MaxAccelerate * (1 if escape_v.Z > 0 else -1)
+            battle_output.UserCommands.append(UserCommand(
+                Command="ACCELERATE",
+                Parameters=AccelerateCommandParameters(ship.Id, escape_v - ship.Velocity))
+            )
+            shoot_nearest_enemy(ship, battle_state, battle_output)
+
     battle_output.Message = debug_string
     debug_string = ''
     return battle_output
