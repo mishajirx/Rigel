@@ -391,7 +391,7 @@ def choose_gun(ship):
     return guns[0]  # самое простое получение пушки
 
 
-def shoot_target_enemy(ship: Ship, enemy_target: Ship, battle_state, battle_output):
+def shoot_target_enemy(ship, enemy_target, battle_state, battle_output):
     global debug_string
     gun = choose_gun(ship)
     # ищем блок, из которого будет вестись стрельба
@@ -412,7 +412,7 @@ def shoot_target_enemy(ship: Ship, enemy_target: Ship, battle_state, battle_outp
         battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                       Parameters=AttackCommandParameters(ship.Id,
                                                                                          gun.Name,
-                                                                                         enemy_target.Position)))
+                                                                                         min_vector + Vector(1, 0, 0))))
         return
     shoot_nearest_enemy(ship, battle_state, battle_output)
     return
@@ -460,11 +460,10 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
                 min_distance = dist_to_point
                 min_vector = point
         if min_distance < 1000000:  # если нашли точку, до которой можем дострелить, то добаляем
-            available.append((enemy.Health, min_vector, enemy))
+            available.append((enemy.Health, min_vector))
     if not available:  # если никого не можем задеть не стреляем
         return
     best_target = sorted(available, key=lambda x: x[0])[0][1]  # враг с самым низким здоровьем
-    enemy_target = sorted(available, key=lambda x: x[0])[0][2]
     debug_string += '   ' + str(ship.Id) + ':' + str(available)
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
@@ -473,7 +472,7 @@ def shoot_nearest_enemy(ship, battle_state: BattleState, battle_output):
     battle_output.UserCommands.append(UserCommand(Command="ATTACK",
                                                   Parameters=AttackCommandParameters(ship.Id,
                                                                                      gun.Name,
-                                                                                     enemy_target.Position)))
+                                                                                     best_target + Vector(1, 0, 0))))
 
 
 draft_options: DraftOptions
